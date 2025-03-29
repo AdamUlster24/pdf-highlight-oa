@@ -18,6 +18,7 @@ import { createWorker } from "tesseract.js";
 // import { useSession } from "next-auth/react";
 import { getPdfId } from "../utils/pdfUtils";
 import { storageMethod } from "../utils/env";
+import { ChatSidebar }from "./ChatSidebar";
 
 export default function App() {
   const [pdfUploaded, setPdfUploaded] = useState(false);
@@ -31,6 +32,7 @@ export default function App() {
   const [highlightsKey, setHighlightsKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const pdfViewerRef = useRef<any>(null);
+  const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false);
   // const session = useSession();
 
   useEffect(() => {
@@ -115,6 +117,11 @@ export default function App() {
     };
     getHighlights();
   }, [pdfName, pdfId]);
+
+  const handleToggleChatSidebar = () => {
+    console.log("Toggling chat sidebar");
+    setIsChatSidebarOpen((prevState) => !prevState);
+  };
 
   const handleHighlightUpload = (file: File) => {
     const fileUrl = URL.createObjectURL(file);
@@ -246,54 +253,54 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-[linear-gradient(120deg,_rgb(249_250_251)_50%,_rgb(239_246_255)_50%)]">
-      <div className="flex-1">
-        <div className="mb-8 sticky top-0">
-          <Header />
-        </div>
-
-        <div className="max-w-4xl mx-auto space-y-6 mb-8">
-          <div className="max-w-xl mx-auto space-y-6">
-            <PdfUploader
-              onFileUpload={handleFileUpload}
-              pdfUploaded={pdfUploaded}
-            />
-            {
-              /* session.status === "authenticated" &&  */ pdfId && (
-                <HighlightUploader
-                  onFileUpload={handleHighlightUpload}
-                  highlights={highlights}
-                  pdfId={pdfId}
+      <div className="flex-1 flex">
+        <div className="flex-1">
+          <div className="mb-8 sticky top-0">
+            <Header />
+          </div>
+  
+          <div className="max-w-4xl mx-auto space-y-6 mb-8">
+            <div className="max-w-xl mx-auto space-y-6">
+              {/* PdfUploader without extra wrapper */}
+              <PdfUploader onFileUpload={handleFileUpload} pdfUploaded={pdfUploaded} />
+              
+              {pdfId && (
+                <HighlightUploader onFileUpload={handleHighlightUpload} highlights={highlights} pdfId={pdfId} />
+              )}
+              
+              {pdfUrl && (
+                <KeywordSearch
+                  searchTerm={searchTerm}
+                  setSearchTerm={setSearchTerm}
+                  handleSearch={handleSearch}
+                  resetHighlights={resetHighlights}
+                  isChatSidebarOpen={isChatSidebarOpen}
+                  setIsChatSidebarOpen={handleToggleChatSidebar}
                 />
-              )
-            }
-            {pdfUrl && (
-              <KeywordSearch
-                searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm}
-                handleSearch={handleSearch}
-                resetHighlights={resetHighlights}
+              )}
+            </div>
+            {loading ? (
+              <div className="w-full flex items-center justify-center">
+                <Spinner />
+              </div>
+            ) : (
+              <PdfViewer
+                pdfUrl={pdfUrl}
+                pdfName={pdfName}
+                pdfId={pdfId}
+                highlights={highlights}
+                setHighlights={setHighlights}
+                highlightsKey={highlightsKey}
+                pdfViewerRef={pdfViewerRef}
+                resetHash={resetHash}
+                scrollViewerTo={scrollViewerTo}
+                scrollToHighlightFromHash={scrollToHighlightFromHash}
               />
             )}
           </div>
-          {loading ? (
-            <div className="w-full flex items-center justify-center">
-              <Spinner />
-            </div>
-          ) : (
-            <PdfViewer
-              pdfUrl={pdfUrl}
-              pdfName={pdfName}
-              pdfId={pdfId}
-              highlights={highlights}
-              setHighlights={setHighlights}
-              highlightsKey={highlightsKey}
-              pdfViewerRef={pdfViewerRef}
-              resetHash={resetHash}
-              scrollViewerTo={scrollViewerTo}
-              scrollToHighlightFromHash={scrollToHighlightFromHash}
-            />
-          )}
         </div>
+  
+        <ChatSidebar pdfUploaded={pdfUploaded} isOpen={isChatSidebarOpen} />
       </div>
     </div>
   );
