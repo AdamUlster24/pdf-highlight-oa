@@ -22,7 +22,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({ pdfUploaded, isOpen}) 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLInputElement>(null)
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (inputMessage.trim() === "") return
 
     // Add user message
@@ -31,16 +31,55 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({ pdfUploaded, isOpen}) 
     setInputMessage("")
     setIsLoading(true)
 
-    // Simulate AI response after a delay
-    setTimeout(() => {
-      // Temporary AI response
-      const aiResponse = {
-        role: "assistant" as const,
-        content: `Here's information about "${inputMessage}" from the PDF.`,
-      }
-      setMessages([...newMessages, aiResponse])
-      setIsLoading(false)
-    }, 1500)
+    try {
+      const response = await fetch("/api/gemini", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: inputMessage }),
+      });
+  
+      const data = await response.json();
+
+    if (data.text) {
+      const aiResponse: Message = { role: "assistant", content: "" };
+      setMessages([...newMessages, aiResponse]);
+
+      // Gradually reveal the AI's answer
+      let index = 0;
+      const typingInterval = setInterval(() => {
+        aiResponse.content += data.text[index];
+        setMessages((prevMessages) => {
+          const updatedMessages = [...prevMessages];
+          updatedMessages[updatedMessages.length - 1] = aiResponse; // Update last message
+          return updatedMessages;
+        });
+        index++;
+
+        // Stop revealing the AI's answer when the full message is displayed
+        if (index === data.text.length) {
+          clearInterval(typingInterval);
+          setIsLoading(false);
+        }
+      }, 10); // 10ms per character
+    }
+    else {
+      setMessages([
+        ...newMessages,
+        { role: "assistant", content: "Sorry, I couldn't generate a response." },
+      ]);
+    }
+  }
+  catch (error) {
+    setMessages([
+      ...newMessages,
+      { role: "assistant", content: "Error communicating with the AI." },
+    ]);
+    }
+    finally {
+      setIsLoading(false);
+    }
   }
 
   // Auto-scroll to the bottom of chat when new messages arrive
