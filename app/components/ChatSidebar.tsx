@@ -44,20 +44,29 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({ pdfUploaded, pdfUrl, i
       // Extract text from the PDF
       const pdfText = await extractPdfText(pdfUrl);
 
-       // Log the information the AI is receiving
+      // Converts the array of conversation history to a string for the AI to be able to read it
+      const conversationHistory = newMessages
+      .map(msg => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
+      .join("\n");
+
+      const fullQuery = `You are an AI assistant helping with PDF analysis. 
+      Here is the conversation so far:\n\n${conversationHistory}
+      \n\nNow answer this question: "${inputMessage}" based on the following PDF text:\n${pdfText}`;
+
+      // Log the information the AI is receiving
       console.log("Sending to AI:", {
+        conversationHistory: conversationHistory, // The conversation history
         query: inputMessage,  // The user input
-        text: pdfText,       // The PDF URL, if you are sending it
-        // You can add other fields here if needed, like context, conversation history, etc.
+        text: pdfText,       // The PDF text
       });
-  
+    
       const response = await fetch("/api/gemini", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          query: `Based on the following text, answer the question: "${inputMessage}".\n\nText:\n${pdfText}`
+          query: fullQuery
         }),
       });
   
