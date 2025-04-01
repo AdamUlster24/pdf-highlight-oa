@@ -300,7 +300,7 @@ export default function App() {
           </div>
         </div>
   
-        <ChatSidebar pdfUploaded={pdfUploaded} isOpen={isChatSidebarOpen} />
+        <ChatSidebar pdfUploaded={pdfUploaded} pdfUrl={pdfUrl} isOpen={isChatSidebarOpen} />
       </div>
     </div>
   );

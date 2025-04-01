@@ -3,6 +3,7 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { MessageSquare, Send } from "lucide-react"
 import { Button } from "./Button"
+import { extractPdfText } from "../utils/pdfUtils";
 
 type Message = {
   role: "user" | "assistant"
@@ -11,10 +12,11 @@ type Message = {
 
 interface ChatSidebarProps {
   pdfUploaded: boolean
+  pdfUrl?: string | null;
   isOpen: boolean
 }
 
-export const ChatSidebar: React.FC<ChatSidebarProps> = ({ pdfUploaded, isOpen}) => {
+export const ChatSidebar: React.FC<ChatSidebarProps> = ({ pdfUploaded, pdfUrl, isOpen}) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -23,64 +25,79 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({ pdfUploaded, isOpen}) 
   const chatInputRef = useRef<HTMLInputElement>(null)
 
   const handleSendMessage = async () => {
-    if (inputMessage.trim() === "") return
-
-    // Add user message
-    const newMessages: Message[] = [...messages, { role: "user" as const, content: inputMessage }]
-    setMessages(newMessages)
-    setInputMessage("")
-    setIsLoading(true)
-
+    if (inputMessage.trim() === "") return;
+    if (!pdfUrl) {
+      setMessages([
+        ...messages,
+        { role: "assistant", content: "Error: No PDF uploaded." },
+      ]);
+      return;
+    }
+  
+    // Add user message to chat
+    const newMessages: Message[] = [...messages, { role: "user", content: inputMessage }];
+    setMessages(newMessages);
+    setInputMessage("");
+    setIsLoading(true);
+  
     try {
+      // Extract text from the PDF
+      const pdfText = await extractPdfText(pdfUrl);
+
+       // Log the information the AI is receiving
+      console.log("Sending to AI:", {
+        query: inputMessage,  // The user input
+        text: pdfText,       // The PDF URL, if you are sending it
+        // You can add other fields here if needed, like context, conversation history, etc.
+      });
+  
       const response = await fetch("/api/gemini", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query: inputMessage }),
+        body: JSON.stringify({
+          query: `Based on the following text, answer the question: "${inputMessage}".\n\nText:\n${pdfText}`
+        }),
       });
   
       const data = await response.json();
-
-    if (data.text) {
-      const aiResponse: Message = { role: "assistant", content: "" };
-      setMessages([...newMessages, aiResponse]);
-
-      // Gradually reveal the AI's answer
-      let index = 0;
-      const typingInterval = setInterval(() => {
-        aiResponse.content += data.text[index];
-        setMessages((prevMessages) => {
-          const updatedMessages = [...prevMessages];
-          updatedMessages[updatedMessages.length - 1] = aiResponse; // Update last message
-          return updatedMessages;
-        });
-        index++;
-
-        // Stop revealing the AI's answer when the full message is displayed
-        if (index === data.text.length) {
-          clearInterval(typingInterval);
-          setIsLoading(false);
-        }
-      }, 10); // 10ms per character
-    }
-    else {
+  
+      if (data.text) {
+        const aiResponse: Message = { role: "assistant", content: "" };
+        setMessages([...newMessages, aiResponse]);
+  
+        // Gradually reveal AI response
+        let index = 0;
+        const typingInterval = setInterval(() => {
+          aiResponse.content += data.text[index];
+          setMessages((prevMessages) => {
+            const updatedMessages = [...prevMessages];
+            updatedMessages[updatedMessages.length - 1] = aiResponse;
+            return updatedMessages;
+          });
+          index++;
+  
+          if (index === data.text.length) {
+            clearInterval(typingInterval);
+            setIsLoading(false);
+          }
+        }, 10);
+      } else {
+        setMessages([
+          ...newMessages,
+          { role: "assistant", content: "Sorry, I couldn't generate a response." },
+        ]);
+      }
+    } catch (error) {
       setMessages([
         ...newMessages,
-        { role: "assistant", content: "Sorry, I couldn't generate a response." },
+        { role: "assistant", content: "Error communicating with the AI." },
       ]);
-    }
-  }
-  catch (error) {
-    setMessages([
-      ...newMessages,
-      { role: "assistant", content: "Error communicating with the AI." },
-    ]);
-    }
-    finally {
+    } finally {
       setIsLoading(false);
     }
-  }
+  };
 
   // Auto-scroll to the bottom of chat when new messages arrive
   useEffect(() => {
