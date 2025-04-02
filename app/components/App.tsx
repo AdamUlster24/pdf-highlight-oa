@@ -18,7 +18,7 @@ import { createWorker } from "tesseract.js";
 // import { useSession } from "next-auth/react";
 import { getPdfId } from "../utils/pdfUtils";
 import { storageMethod } from "../utils/env";
-import { ChatSidebar }from "./ChatSidebar";
+import { ChatSidebar } from "./ChatSidebar";
 
 export default function App() {
   const [pdfUploaded, setPdfUploaded] = useState(false);
@@ -300,7 +300,13 @@ export default function App() {
           </div>
         </div>
   
-        <ChatSidebar pdfUploaded={pdfUploaded} pdfUrl={pdfUrl} isOpen={isChatSidebarOpen} />
+        <ChatSidebar 
+          pdfUploaded={pdfUploaded} 
+          pdfUrl={pdfUrl} 
+          isOpen={isChatSidebarOpen}
+          pdfId={pdfId}
+          pdfName={pdfName}
+        />
       </div>
     </div>
   );
