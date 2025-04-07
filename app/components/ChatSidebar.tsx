@@ -12,6 +12,7 @@ type ChatSidebarProps = {
   isOpen: boolean;
   pdfId: string | null;
   pdfName: string | null;
+  onLoadConversation: (conversationPdfId: string) => Promise<boolean>;
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({ 
@@ -19,7 +20,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   pdfUrl, 
   isOpen,
   pdfId,
-  pdfName 
+  pdfName,
+  onLoadConversation
 }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
@@ -27,29 +29,48 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
+  const [currentPdfId, setCurrentPdfId] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLInputElement>(null)
 
-  // Fetch conversations when sidebar opens
+  // Fetch conversations when sidebar opens or when PDF is uploaded
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen || pdfUploaded) {
       fetchConversations();
     }
-  }, [isOpen]);
+  }, [isOpen, pdfUploaded]);
 
   // Create new conversation when PDF is uploaded
   useEffect(() => {
-    if (pdfUploaded && pdfId && pdfName && !currentConversationId) {
-      createNewConversation();
+    if (pdfUploaded && pdfId && pdfName) {
+      // Check if a conversation already exists for this PDF
+      const existingConversation = conversations.find(conv => conv.pdfId === pdfId);
+      if (!existingConversation) {
+        createNewConversation();
+      } else {
+        // If conversation exists, set it as current
+        setCurrentConversationId(existingConversation.id);
+        setCurrentPdfId(pdfId);
+        // Load the messages for this conversation
+        loadConversation(existingConversation.id);
+      }
     }
-  }, [pdfUploaded, pdfId, pdfName]);
+  }, [pdfUploaded, pdfId, pdfName, conversations]);
+
+  // Update currentPdfId when pdfId changes
+  useEffect(() => {
+    if (pdfId) {
+      setCurrentPdfId(pdfId);
+    }
+  }, [pdfId]);
 
   const fetchConversations = async () => {
     try {
       const response = await fetch("/api/conversation");
       if (response.ok) {
         const data = await response.json();
+        console.log("Fetching conversations");
         setConversations(data);
       }
     } catch (error) {
@@ -69,8 +90,12 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
       
       if (response.ok) {
         const conversation = await response.json();
+        console.log("Creating new conversation");
         setCurrentConversationId(conversation.id);
+        setCurrentPdfId(pdfId);
         setMessages([]);
+        // Refresh conversations list
+        fetchConversations();
       }
     } catch (error) {
       console.error("Error creating conversation:", error);
@@ -85,6 +110,27 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         setCurrentConversationId(conversation.id);
         setMessages(messages);
         setShowHistory(false);
+
+        // Load the corresponding PDF
+        const pdfLoaded = await onLoadConversation(conversation.pdfId);
+        if (pdfLoaded) {
+          setCurrentPdfId(conversation.pdfId);
+        } else {
+          // If PDF is not available, show an error message
+          const errorMessage: Message = {
+            id: crypto.randomUUID(),
+            conversationId: conversation.id,
+            role: "assistant",
+            content: "Error: The PDF file for this conversation is no longer available.",
+            createdAt: new Date().toISOString()
+          };
+          setMessages([...messages, errorMessage]);
+          await fetch(`/api/conversation/${conversationId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(errorMessage),
+          });
+        }
       }
     } catch (error) {
       console.error("Error loading conversation:", error);
@@ -93,7 +139,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
   const handleSendMessage = async () => {
     if (inputMessage.trim() === "") return;
-    if (!pdfUrl || !currentConversationId) {
+    if (!pdfUrl || !currentConversationId || !currentPdfId) {
       setMessages([
         ...messages,
         { id: crypto.randomUUID(), conversationId: currentConversationId!, role: "assistant", content: "Error: No PDF uploaded.", createdAt: new Date().toISOString() },
