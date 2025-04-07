@@ -176,9 +176,9 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         .map(msg => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
         .join("\n");
 
-      const fullQuery = `You are an AI assistant helping with PDF analysis. 
-      Here is the conversation so far:\n\n${conversationHistory}
-      \n\nNow answer this question: "${inputMessage}" based on the following PDF text:\n${pdfText}`;
+        const fullQuery = `You are an AI assistant helping with PDF analysis. When using information directly from the PDF, enclose it in quotation marks and include the page number it came from.\n\n
+        Here is the conversation so far:\n\n${conversationHistory}\n\n
+        Now answer this question: "${inputMessage}" based on the following PDF text:\n${pdfText}`;
 
       const response = await fetch("/api/gemini", {
         method: "POST",
