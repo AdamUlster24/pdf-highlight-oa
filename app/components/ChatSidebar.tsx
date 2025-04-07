@@ -28,6 +28,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const [isLoading, setIsLoading] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
+  const [conversationsLoaded, setConversationsLoaded] = useState(false);
   const [showHistory, setShowHistory] = useState(false)
   const [currentPdfId, setCurrentPdfId] = useState<string | null>(null)
 
@@ -43,7 +44,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
   // Create new conversation when PDF is uploaded
   useEffect(() => {
-    if (pdfUploaded && pdfId && pdfName) {
+    if (pdfUploaded && pdfId && pdfName && conversationsLoaded) {
       // Check if a conversation already exists for this PDF
       const existingConversation = conversations.find(conv => conv.pdfId === pdfId);
       if (!existingConversation) {
@@ -72,6 +73,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         const data = await response.json();
         console.log("Fetching conversations");
         setConversations(data);
+        setConversationsLoaded(true);
       }
     } catch (error) {
       console.error("Error fetching conversations:", error);
@@ -176,10 +178,12 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         .map(msg => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
         .join("\n");
 
-        const fullQuery = `You are an AI assistant helping with PDF analysis. When using information directly from the PDF, enclose it in quotation marks and include the page number it came from.\n\n
-        Here is the conversation so far:\n\n${conversationHistory}\n\n
-        Now answer this question: "${inputMessage}" based on the following PDF text:\n${pdfText}`;
-
+        const fullQuery = `You are an AI assistant helping with PDF analysis. 
+        Here is the conversation so far:\n\n${conversationHistory}
+        \n\nNow answer this question: "${inputMessage}" based on the following PDF text:\n${pdfText}.
+        When providing an answer, cite the specific passage from the PDF that supports your response. 
+        Return the citation in the format: "[Page X, Line Y-Z]" and include the exact passage. Keep your responses to less than 100 words when possible`;
+        
       const response = await fetch("/api/gemini", {
         method: "POST",
         headers: {
