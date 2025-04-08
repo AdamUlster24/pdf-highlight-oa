@@ -18,7 +18,7 @@ import { createWorker } from "tesseract.js";
 // import { useSession } from "next-auth/react";
 import { getPdfId } from "../utils/pdfUtils";
 import { storageMethod } from "../utils/env";
-import { ChatSidebar }from "./ChatSidebar";
+import { ChatSidebar } from "./ChatSidebar";
 
 export default function App() {
   const [pdfUploaded, setPdfUploaded] = useState(false);
@@ -33,6 +33,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const pdfViewerRef = useRef<any>(null);
   const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false);
+  const [pdfFiles, setPdfFiles] = useState<Record<string, { file: File, url: string }>>({});
   // const session = useSession();
 
   useEffect(() => {
@@ -46,6 +47,13 @@ export default function App() {
       file.name,
       /* session.data?.user?.email ?? */ undefined
     );
+    
+    // Store the file and URL for future use
+    setPdfFiles(prev => ({
+      ...prev,
+      [pdfId]: { file, url: fileUrl }
+    }));
+
     // Creating a searchable PDF:
     // Convert uploaded PDF file to b64 image,
     //   perform OCR,
@@ -64,32 +72,24 @@ export default function App() {
       const blob = new Blob([new Uint8Array(pdf)], { type: "application/pdf" });
       const fileOcrUrl = URL.createObjectURL(blob);
       setPdfOcrUrl(fileOcrUrl);
-
-      // Index words
-      // const data = res.data.words;
-      // const words = data.map(({ text, bbox: { x0, y0, x1, y1 } }) => {
-      //   return {
-      //     keyword: text,
-      //     x1: x0,
-      //     y1: y0,
-      //     x2: x1,
-      //     y2: y1,
-      //   };
-      // });
-      // await fetch("/api/index", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({
-      //     pdfId,
-      //     words,
-      //   }),
-      // });
     }
     setPdfUrl(fileUrl);
     setPdfUploaded(true);
     setPdfName(file.name);
     setPdfId(pdfId);
     setLoading(false);
+  };
+
+  const loadPdfForConversation = async (conversationPdfId: string) => {
+    const pdfData = pdfFiles[conversationPdfId];
+    if (pdfData) {
+      setPdfUrl(pdfData.url);
+      setPdfUploaded(true);
+      setPdfName(pdfData.file.name);
+      setPdfId(conversationPdfId);
+      return true;
+    }
+    return false;
   };
 
   useEffect(() => {
@@ -300,7 +300,14 @@ export default function App() {
           </div>
         </div>
   
-        <ChatSidebar pdfUploaded={pdfUploaded} isOpen={isChatSidebarOpen} />
+        <ChatSidebar 
+          pdfUploaded={pdfUploaded} 
+          pdfUrl={pdfUrl} 
+          isOpen={isChatSidebarOpen}
+          pdfId={pdfId}
+          pdfName={pdfName}
+          onLoadConversation={loadPdfForConversation}
+        />
       </div>
     </div>
   );
